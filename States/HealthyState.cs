@@ -5,79 +5,57 @@ namespace InfectionSimulation
     public class HealthyState : IIndividualState
     {
         public string Name => "healthy";
-
         public Color GetColor() => Color.FromRgb(34, 197, 94);
 
-        public void Update(Individual me, double deltaTime, List<Individual> allIndividuals)
+        public void Update(Individual me, double dt, List<Individual> all, Random random)
         {
-            // Lista ID obecnych w pobliżu w tej klatce (do czyszczenia starych kontaktów)
+            // Sprawdź kontakty z chorymi
             var currentContacts = new HashSet<int>();
 
-            foreach (var other in allIndividuals)
+            foreach (var other in all)
             {
-                if (other.Id == me.Id) continue; // Nie sprawdzamy siebie
-                if (other.IsDeadOrLeft) continue;
+                if (other.Id == me.Id || other.IsDeadOrLeft)
+                    continue;
 
-                // Sprawdzamy tylko chorych (źródła zakażenia)
-                bool isContagious = other.State is InfectedAsymptomaticState ||
-                                    other.State is InfectedSymptomaticState;
+                bool contagious = other.State is InfectedAsymptomaticState or InfectedSymptomaticState;
+                if (!contagious)
+                    continue;
 
-                if (!isContagious) continue;
-
-                // a) Warunek dystansu (< 2m)
                 double dist = me.Position.Distance(other.Position);
-                if (dist <= SimConfig.INFECTION_DISTANCE)
+                if (dist > SimConfig.INFECTION_DISTANCE)
+                    continue;
+
+                currentContacts.Add(other.Id);
+
+                // Zliczaj czas kontaktu
+                if (!me.CloseContactTime.ContainsKey(other.Id))
+                    me.CloseContactTime[other.Id] = 0;
+
+                me.CloseContactTime[other.Id] += dt;
+
+                // Próba zarażenia po 3 sekundach
+                if (me.CloseContactTime[other.Id] >= SimConfig.CONTACT_TIME_REQUIRED)
                 {
-                    currentContacts.Add(other.Id);
+                    double chance = other.State is InfectedAsymptomaticState ? 0.50 : 1.00;
 
-                    // Zliczamy czas kontaktu
-                    if (!me.CloseContactTime.ContainsKey(other.Id))
-                        me.CloseContactTime[other.Id] = 0;
-
-                    me.CloseContactTime[other.Id] += deltaTime;
-
-                    // b) Warunek czasu (> 3s)
-                    if (me.CloseContactTime[other.Id] >= SimConfig.CONTACT_TIME_REQUIRED)
+                    if (random.NextDouble() < chance)
                     {
-                        // Próba zarażenia
-                        TryInfect(me, other);
-
-                        // Po próbie (udanej lub nie) resetujemy licznik dla tej pary, 
-                        // żeby nie losować co klatkę setki razy
-                        me.CloseContactTime[other.Id] = 0;
+                        me.State = random.NextDouble() < 0.5
+                            ? new InfectedSymptomaticState()
+                            : new InfectedAsymptomaticState();
+                        me.InfectionTime = 0;
+                        me.CloseContactTime.Clear();
+                        return; // Już zarażony, koniec
                     }
+
+                    me.CloseContactTime[other.Id] = 0; // Reset licznika po próbie
                 }
             }
 
-            // Czyszczenie kontaktów, które się oddaliły
-            // Jeśli kogoś nie ma w currentContacts, usuwamy go z licznika czasu
-            var idsToRemove = me.CloseContactTime.Keys.Where(k => !currentContacts.Contains(k)).ToList();
-            foreach (var id in idsToRemove)
-            {
+            // Usuń kontakty z oddalonych osobników (proste czyszczenie)
+            var toRemove = me.CloseContactTime.Keys.Where(k => !currentContacts.Contains(k)).ToList();
+            foreach (var id in toRemove)
                 me.CloseContactTime.Remove(id);
-            }
-        }
-
-        private void TryInfect(Individual me, Individual source)
-        {
-            double chance = 0;
-
-            // Prawdopodobieństwo zależne od objawów źródła
-            if (source.State is InfectedAsymptomaticState) chance = 0.50; // 50%
-            else if (source.State is InfectedSymptomaticState) chance = 1.00; // 100%
-
-            // Rzut kostką
-            if (new Random().NextDouble() < chance)
-            {
-                // Zarażenie! Losujemy czy będzie objawowy czy nie (50/50 - założenie z kodu głównego)
-                bool symptomatic = new Random().NextDouble() < 0.5;
-
-                if (symptomatic) me.State = new InfectedSymptomaticState();
-                else me.State = new InfectedAsymptomaticState();
-
-                // Reset czasu infekcji
-                me.InfectionTime = 0;
-            }
         }
     }
 }

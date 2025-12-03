@@ -7,7 +7,7 @@ namespace InfectionSimulation
         public string Name => "infected_asymptomatic";
         public Color GetColor() => Colors.Yellow;
 
-        public void Update(Individual me, double deltaTime, List<Individual> allIndividuals)
+        public void Update(Individual me, double deltaTime, List<Individual> allIndividuals, Random random)
         {
             me.InfectionTime += deltaTime;
 

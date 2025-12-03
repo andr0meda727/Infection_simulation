@@ -5,133 +5,88 @@ namespace InfectionSimulation
     public class Individual
     {
         public int Id { get; set; }
-        public Vector2D Position { get; set; }     // w pikselach
-        public Vector2D Velocity { get; set; }     // w pikselach na sekundę
+        public Vector2D Position { get; set; }
+        public Vector2D Velocity { get; set; }
         public IIndividualState State { get; set; }
-        public Dictionary<int, double> CloseContactTime { get; set; } // sekundy
-        public double InfectionTime { get; set; } // sekundy
-        public double InfectionDuration { get; set; } // sekundy
-        public bool IsDeadOrLeft { get; private set; } = false;
+        public Dictionary<int, double> CloseContactTime { get; set; }
+        public double InfectionTime { get; set; }
+        public double InfectionDuration { get; set; }
+        public bool IsDeadOrLeft { get; set; }
 
-        private Random _random;
-        public readonly object StateLock = new object();
-
-        // Stałe symulacji (zgodne z MainWindow)
         private const double PIXELS_PER_METER = 10.0;
-        private const double MAX_SPEED_MPS = 2.5;
-        private const double MAX_SPEED_PIXELS = MAX_SPEED_MPS * PIXELS_PER_METER;
+        private const double MIN_SPEED_PIXELS = 0.5 * PIXELS_PER_METER;
+        private const double MAX_SPEED_PIXELS = 2.5 * PIXELS_PER_METER;
 
-        // Minimalna akceptowalna prędkość (żeby nie zamarzali)
-        private const double MIN_SPEED_PIXELS = 0.05 * PIXELS_PER_METER; // 5 cm/s ~ 0.05 m/s
 
-        public Individual(int id, double x, double y, bool isImmune)
+        public Individual(int id, double x, double y, bool isImmune, Random random)
         {
             Id = id;
             Position = new Vector2D(x, y);
-            _random = new Random(Guid.NewGuid().GetHashCode());
 
-            // Losujemy kierunek i prędkość w [0, MAX_SPEED_MPS] (m/s), potem konwertujemy do px/s
-            double angle = _random.NextDouble() * 2.0 * Math.PI;
-            double speedMps = _random.NextDouble() * MAX_SPEED_MPS; // [0..2.5] m/s
-            double speedPixels = speedMps * PIXELS_PER_METER;
+            double angle = random.NextDouble() * 2.0 * Math.PI;
+            double speed = MIN_SPEED_PIXELS + random.NextDouble() * (MAX_SPEED_PIXELS - MIN_SPEED_PIXELS);
+            Velocity = new Vector2D(Math.Cos(angle) * speed, Math.Sin(angle) * speed);
 
-            Velocity = new Vector2D(Math.Cos(angle) * speedPixels, Math.Sin(angle) * speedPixels);
-
-            State = isImmune ? (IIndividualState)new ImmuneState() : new HealthyState();
+            State = isImmune ? new ImmuneState() : new HealthyState();
             CloseContactTime = new Dictionary<int, double>();
-            InfectionTime = 0;
-            InfectionDuration = 20.0 + _random.NextDouble() * 10.0;
+            InfectionDuration = 20.0 + random.NextDouble() * 10.0;
         }
 
-        public bool Update(double deltaTime, int width, int height, List<Individual> allIndividuals)
+        public void Update(double dt, int width, int height, List<Individual> all, Random random)
         {
-            // --- 1. Sterowanie kierunkiem (probabilistycznie) ---
-            // Prawdopodobienstwo zmian na 1 sekundę = 0.1 (przykład) -> przeskalowujemy na krok: p_step = p_sec * deltaTime
-            double steeringProbabilityPerSecond = 0.10; // oczekiwana liczba zdarzeń na sekundę
-            double pStep = steeringProbabilityPerSecond * deltaTime;
-
-            if (_random.NextDouble() < pStep)
+            // Losowe skręty (10% szans na sekundę)
+            if (random.NextDouble() < 0.1 * dt)
             {
-                // mały kat skrętu, rzadziej duże
-                double maxTurnRad = 0.25; // ~14 deg
-                double turnAngle = (_random.NextDouble() - 0.5) * maxTurnRad;
+                double turn = (random.NextDouble() - 0.5) * 0.3;
+                double cos = Math.Cos(turn);
+                double sin = Math.Sin(turn);
+                double newX = Velocity.X * cos - Velocity.Y * sin;
+                double newY = Velocity.X * sin + Velocity.Y * cos;
 
-                // Obrót wektora
-                double newX = Velocity.X * Math.Cos(turnAngle) - Velocity.Y * Math.Sin(turnAngle);
-                double newY = Velocity.X * Math.Sin(turnAngle) + Velocity.Y * Math.Cos(turnAngle);
+                Velocity = new Vector2D(newX, newY);
 
-                // Drobna zmiana prędkości: 0.98 - 1.02 (nie zabijamy prędkości)
-                double speedChange = 0.98 + (_random.NextDouble() * 0.04);
-                Vector2D potentialVelocity = new Vector2D(newX * speedChange, newY * speedChange);
-
-                // Jeśli wektor jest bliski zeru, nadaj losowy niewielki kierunek z minimalną prędkością
-                if (potentialVelocity.Abs() < 1e-6)
+                // Utrzymuj prędkość w zakresie
+                double speed = Velocity.Abs();
+                if (speed < MIN_SPEED_PIXELS || speed > MAX_SPEED_PIXELS)
                 {
-                    double angle = _random.NextDouble() * Math.PI * 2.0;
-                    double v = MIN_SPEED_PIXELS;
-                    potentialVelocity = new Vector2D(Math.Cos(angle) * v, Math.Sin(angle) * v);
+                    double target = Math.Clamp(speed, MIN_SPEED_PIXELS, MAX_SPEED_PIXELS);
+                    double scale = target / speed;
+                    Velocity = new Vector2D(Velocity.X * scale, Velocity.Y * scale);
                 }
-
-                // Limit prędkości (max)
-                double currentSpeed = potentialVelocity.Abs();
-                if (currentSpeed > MAX_SPEED_PIXELS)
-                {
-                    double scale = MAX_SPEED_PIXELS / currentSpeed;
-                    potentialVelocity = new Vector2D(potentialVelocity.X * scale, potentialVelocity.Y * scale);
-                }
-
-                // Minimalna prędkość (żeby nie "umierały" do zera)
-                if (potentialVelocity.Abs() < MIN_SPEED_PIXELS)
-                {
-                    double scale = MIN_SPEED_PIXELS / (potentialVelocity.Abs() < 1e-6 ? 1e-6 : potentialVelocity.Abs());
-                    potentialVelocity = new Vector2D(potentialVelocity.X * scale, potentialVelocity.Y * scale);
-                }
-
-                Velocity = potentialVelocity;
             }
 
-            // --- 2. Jeżeli prędkość jest prawie zero, nadaj losowy kierunek i min prędkość ---
-            if (Velocity.Abs() < MIN_SPEED_PIXELS)
-            {
-                double angle = _random.NextDouble() * Math.PI * 2.0;
-                Velocity = new Vector2D(Math.Cos(angle) * MIN_SPEED_PIXELS, Math.Sin(angle) * MIN_SPEED_PIXELS);
-            }
-
-            // --- 3. Ruch: pozycja += velocity (pixels/s) * deltaTime (s) ---
+            // Ruch
             Position = new Vector2D(
-                Position.X + Velocity.X * deltaTime,
-                Position.Y + Velocity.Y * deltaTime
+                Position.X + Velocity.X * dt,
+                Position.Y + Velocity.Y * dt
             );
 
-            // --- 4. Obsługa granic ---
+            // Granice - odbicie lub wyjście
             if (Position.X <= 0 || Position.X >= width)
             {
-                if (_random.NextDouble() < 0.5)
-                    Velocity = new Vector2D(-Velocity.X, Velocity.Y); // odbicie
+                if (random.NextDouble() < 0.5)
+                    Velocity = new Vector2D(-Velocity.X, Velocity.Y);
                 else
-                    IsDeadOrLeft = true; // opuszcza obszar
+                    IsDeadOrLeft = true;
             }
+
             if (Position.Y <= 0 || Position.Y >= height)
             {
-                if (_random.NextDouble() < 0.5)
+                if (random.NextDouble() < 0.5)
                     Velocity = new Vector2D(Velocity.X, -Velocity.Y);
                 else
                     IsDeadOrLeft = true;
             }
 
-            // Clamp pozycji (żeby nie wypadli poza widok przy odbiciu)
-            Position = new Vector2D(Math.Max(0, Math.Min(width, Position.X)), Math.Max(0, Math.Min(height, Position.Y)));
+            Position = new Vector2D(
+                Math.Clamp(Position.X, 0, width),
+                Math.Clamp(Position.Y, 0, height)
+            );
 
-            // --- 5. Logika stanów (zarażanie i zdrowienie) ---
-            lock (StateLock)
-            {
-                State.Update(this, deltaTime, allIndividuals);
-            }
-
-            return !IsDeadOrLeft;
+            // Logika stanu (zarażanie)
+            State.Update(this, dt, all, random);
         }
 
-        // Memento pattern (bez zmian)
         public IndividualMemento SaveState()
         {
             return new IndividualMemento
@@ -147,14 +102,13 @@ namespace InfectionSimulation
             };
         }
 
-        public static Individual RestoreState(IndividualMemento memento, Random random)
+        public static Individual RestoreState(IndividualMemento m, Random random)
         {
-            var individual = new Individual(memento.Id, memento.PositionX, memento.PositionY, false);
-            individual.Velocity = new Vector2D(memento.VelocityX, memento.VelocityY);
-            individual.InfectionTime = memento.InfectionTime;
-            individual.InfectionDuration = memento.InfectionDuration;
-
-            individual.State = memento.StateName switch
+            var ind = new Individual(m.Id, m.PositionX, m.PositionY, false, random);
+            ind.Velocity = new Vector2D(m.VelocityX, m.VelocityY);
+            ind.InfectionTime = m.InfectionTime;
+            ind.InfectionDuration = m.InfectionDuration;
+            ind.State = m.StateName switch
             {
                 "healthy" => new HealthyState(),
                 "infected_asymptomatic" => new InfectedAsymptomaticState(),
@@ -162,8 +116,7 @@ namespace InfectionSimulation
                 "immune" => new ImmuneState(),
                 _ => new HealthyState()
             };
-
-            return individual;
+            return ind;
         }
     }
 }

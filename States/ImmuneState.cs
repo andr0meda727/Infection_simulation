@@ -8,7 +8,7 @@ namespace InfectionSimulation
 
         public Color GetColor() => Color.FromRgb(59, 130, 246);
 
-        public void Update(Individual individual, double deltaTime, List<Individual> allIndividuals)
+        public void Update(Individual me, double dt, List<Individual> allIndividuals, Random random)
         {
             // Immune individuals don't change state
         }
