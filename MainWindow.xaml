@@ -1,0 +1,112 @@
+﻿<Window x:Class="InfectionSimulation.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Symulacja Rozprzestrzeniania Infekcji" Height="800" Width="1200"
+        Background="#1F2937">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="300"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Canvas do symulacji -->
+        <Border Grid.Column="0" Background="#374151" Margin="10" CornerRadius="10">
+            <Canvas x:Name="SimulationCanvas" Width="800" Height="600" Background="#4B5563"/>
+        </Border>
+
+        <!-- Panel kontrolny -->
+        <StackPanel Grid.Column="1" Margin="10">
+            <TextBlock Text="Symulacja Infekcji" FontSize="24" FontWeight="Bold" 
+                       Foreground="White" Margin="0,0,0,20" HorizontalAlignment="Center"/>
+
+            <!-- Przyciski kontrolne -->
+            <Button x:Name="StartButton" Content="Start" Click="StartButton_Click" 
+                    Height="40" Margin="0,5" FontSize="16" Background="#3B82F6" 
+                    Foreground="White" BorderThickness="0"/>
+
+            <Button x:Name="PauseButton" Content="Pauza" Click="PauseButton_Click" 
+                    Height="40" Margin="0,5" FontSize="16" Background="#EF4444" 
+                    Foreground="White" BorderThickness="0" IsEnabled="False"/>
+
+            <Button x:Name="ResetButton" Content="Reset" Click="ResetButton_Click" 
+                    Height="40" Margin="0,5" FontSize="16" Background="#10B981" 
+                    Foreground="White" BorderThickness="0"/>
+
+            <Button x:Name="SaveButton" Content="Zapisz Stan" Click="SaveButton_Click" 
+                    Height="40" Margin="0,5" FontSize="16" Background="#8B5CF6" 
+                    Foreground="White" BorderThickness="0"/>
+
+            <Button x:Name="LoadButton" Content="Wczytaj Stan" Click="LoadButton_Click" 
+                    Height="40" Margin="0,5" FontSize="16" Background="#F59E0B" 
+                    Foreground="White" BorderThickness="0"/>
+
+            <!-- Checkbox odpornościowy -->
+            <CheckBox x:Name="ImmunityCheckBox" Content="Część populacji z odpornością" 
+                      Foreground="White" Margin="0,20,0,10" FontSize="14"
+                      Checked="ImmunityCheckBox_Changed" Unchecked="ImmunityCheckBox_Changed"/>
+
+            <!-- Statystyki -->
+            <Border Background="#374151" Padding="10" Margin="0,20,0,0" CornerRadius="5">
+                <StackPanel>
+                    <TextBlock Text="Statystyki" FontSize="18" FontWeight="Bold" 
+                               Foreground="White" Margin="0,0,0,10"/>
+
+                    <TextBlock x:Name="TimeText" Text="Czas: 0.0s" Foreground="White" 
+                               FontSize="14" Margin="0,5"/>
+
+                    <TextBlock x:Name="PopulationText" Text="Populacja: 0" Foreground="White" 
+                               FontSize="14" Margin="0,5"/>
+
+                    <TextBlock x:Name="HealthyText" Text="Zdrowi: 0" Foreground="#22C55E" 
+                               FontSize="14" Margin="0,5"/>
+
+                    <TextBlock x:Name="InfectedText" Text="Zarażeni: 0" Foreground="#EF4444" 
+                               FontSize="14" Margin="0,5"/>
+
+                    <TextBlock x:Name="ImmuneText" Text="Odporni: 0" Foreground="#3B82F6" 
+                               FontSize="14" Margin="0,5"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Legenda -->
+            <Border Background="#374151" Padding="10" Margin="0,20,0,0" CornerRadius="5">
+                <StackPanel>
+                    <TextBlock Text="Legenda" FontSize="18" FontWeight="Bold" 
+                               Foreground="White" Margin="0,0,0,10"/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,5">
+                        <Ellipse Width="15" Height="15" Fill="#22C55E" Margin="0,0,10,0"/>
+                        <TextBlock Text="Zdrowy (podatny)" Foreground="White" FontSize="12"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,5">
+                        <Ellipse Width="15" Height="15" Fill="#EAB308" Margin="0,0,10,0"/>
+                        <TextBlock Text="Zarażony (bezobjawowy)" Foreground="White" FontSize="12"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,5">
+                        <Ellipse Width="15" Height="15" Fill="#EF4444" Margin="0,0,10,0"/>
+                        <TextBlock Text="Zarażony (objawowy)" Foreground="White" FontSize="12"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,5">
+                        <Ellipse Width="15" Height="15" Fill="#3B82F6" Margin="0,0,10,0"/>
+                        <TextBlock Text="Odporny" Foreground="White" FontSize="12"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Informacje -->
+            <TextBlock Text="Zasady symulacji:" FontSize="14" FontWeight="Bold" 
+                       Foreground="White" Margin="0,20,0,5"/>
+            <TextBlock TextWrapping="Wrap" Foreground="#9CA3AF" FontSize="11" LineHeight="16">
+                • Zarażenie: ≤2m przez ≥3s<LineBreak/>
+                • Bezobjawowy: 50% szans<LineBreak/>
+                • Objawowy: 100% szans<LineBreak/>
+                • Infekcja trwa 20-30s<LineBreak/>
+                • Prędkość max: 2.5 m/s<LineBreak/>
+                • 25 kroków na sekundę
+            </TextBlock>
+        </StackPanel>
+    </Grid>
+</Window>
