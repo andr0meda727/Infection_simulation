@@ -1,4 +1,5 @@
 ﻿using System.Windows.Media;
+using Infection_Simulation.Simulation;
 
 namespace InfectionSimulation
 {
@@ -45,14 +46,14 @@ namespace InfectionSimulation
                             : new InfectedAsymptomaticState();
                         me.InfectionTime = 0;
                         me.CloseContactTime.Clear();
-                        return; // Już zarażony, koniec
+                        return; // Zarazony
                     }
 
                     me.CloseContactTime[other.Id] = 0; // Reset licznika po próbie
                 }
             }
 
-            // Usuń kontakty z oddalonych osobników (proste czyszczenie)
+            // Usuwa kontakty, tych osobnikow ktore sie oddalily
             var toRemove = me.CloseContactTime.Keys.Where(k => !currentContacts.Contains(k)).ToList();
             foreach (var id in toRemove)
                 me.CloseContactTime.Remove(id);
